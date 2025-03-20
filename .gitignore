@@ -1,52 +1,40 @@
-# Prerequisites
-*.d
+# Ignore Visual Studio-specific files
+.vscode/
+*.vs/
+*.vscode/
 
-# Object files
-*.o
-*.ko
-*.obj
-*.elf
+# Ignore build outputs
+bin/
+obj/
 
-# Linker output
-*.ilk
-*.map
-*.exp
+# Ignore user-specific settings
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
 
-# Precompiled Headers
-*.gch
-*.pch
+# Ignore NuGet packages
+packages/
+**/node_modules/
 
-# Libraries
-*.lib
-*.a
-*.la
-*.lo
+# Ignore logs and database files
+logs/
+*.log
 
-# Shared objects (inc. Windows DLLs)
-*.dll
-*.so
-*.so.*
-*.dylib
+# Ignore publish and deployment artifacts
+publish/
+wwwroot/
+wwwroot/lib/
 
-# Executables
-*.exe
-*.out
-*.app
-*.i*86
-*.x86_64
-*.hex
+# Ignore environment files
+.env
+appsettings*.json
+secrets.json
 
-# Debug files
-*.dSYM/
-*.su
-*.idb
-*.pdb
+# Ignore generated files
+**/Generated/
+**/*.generated.cs
 
-# Kernel Module Compile Results
-*.mod*
-*.cmd
-.tmp_versions/
-modules.order
-Module.symvers
-Mkfile.old
-dkms.conf
+# Ignore Rider & JetBrains IDE files
+.idea/
+*.sln.iml
