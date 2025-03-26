@@ -13,7 +13,7 @@ namespace PersonalDiary.Web.Services.Interface
         Task<List<DiaryEntryDTO>> GetMyEntriesAsync();
         Task<DiaryEntryDTO> GetDiaryEntryAsync(int id);
         Task<DiaryEntryDTO> CreateDiaryEntryAsync(DiaryEntryCreateDTO entryDto);
-        Task<DiaryEntryDTO> UpdateDiaryEntryAsync(int id, DiaryEntryUpdateDTO entryDto);
+        Task UpdateDiaryEntryAsync(int id, DiaryEntryUpdateDTO entryDto);
         Task DeleteDiaryEntryAsync(int id);
 
         //comments

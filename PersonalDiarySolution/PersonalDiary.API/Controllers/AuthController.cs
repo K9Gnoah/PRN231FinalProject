@@ -28,12 +28,12 @@ namespace PersonalDiary.API.Controllers
         [HttpPost("register")]
         public async Task<ActionResult<AuthResponse>> Register(RegisterRequest request)
         {
-            if(await _context.Users.AnyAsync(u => u.Username == request.Username))
+            if (await _context.Users.AnyAsync(u => u.Username == request.Username))
             {
                 return BadRequest(new AuthResponse { Success = false, Message = "Username already exists" });
             }
 
-            if(await _context.Users.AnyAsync(u => u.Email == request.Email))
+            if (await _context.Users.AnyAsync(u => u.Email == request.Email))
             {
                 return BadRequest(new AuthResponse { Success = false, Message = "Email already exists" });
             }
@@ -52,7 +52,7 @@ namespace PersonalDiary.API.Controllers
             await _context.SaveChangesAsync();
 
             //tao token
-            var token = GenerateJwtToken(user);
+            var token = GenerateJwtToken(user.Username); 
 
             return Ok(new AuthResponse
             {
@@ -64,24 +64,24 @@ namespace PersonalDiary.API.Controllers
         }
 
         [HttpPost("login")]
-        public async Task<ActionResult<AuthResponse>> Login(LoginRequest request)
+        public async Task<ActionResult<AuthResponse>> Login(LoginRequest loginRequest)
         {
             var user = await _context.Users
-                .FirstOrDefaultAsync(u => u.Username == request.Username);
+                .FirstOrDefaultAsync(u => u.Username == loginRequest.Username);
 
-            if (user == null || !VerifyPassword(request.Password, user.PasswordHash))
+            if (user == null || !VerifyPassword(loginRequest.Password, user.PasswordHash))
             {
                 return Unauthorized(new AuthResponse
-                { 
-                    Success = false, 
-                    Message = "Invalid username or password" 
+                {
+                    Success = false,
+                    Message = "Invalid username or password"
                 });
             }
 
             user.LastLoginDate = DateTime.Now;
             await _context.SaveChangesAsync();
 
-            var token = GenerateJwtToken(user);
+            var token = GenerateJwtToken(user.Username);
 
             return Ok(new AuthResponse
             {
@@ -92,6 +92,47 @@ namespace PersonalDiary.API.Controllers
             });
         }
 
+        private string GenerateJwtToken(string username)
+        {
+            var user = _context.Users.FirstOrDefault(u => u.Username == username);
+            if (user == null)
+            {
+                throw new Exception("User not found");
+            }
+
+            var claims = new List<Claim>
+            {
+                new Claim(JwtRegisteredClaimNames.Sub, username),
+                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+                new Claim("userId", user.UserId.ToString()), // Đảm bảo userId không rỗng
+                new Claim("nameid", user.UserId.ToString()),
+                new Claim(ClaimTypes.NameIdentifier, user.UserId.ToString())
+            };
+
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]));
+            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+            var token = new JwtSecurityToken(
+                issuer: _configuration["Jwt:Issuer"],
+                audience: _configuration["Jwt:Audience"],
+                claims: claims,
+                expires: DateTime.Now.AddHours(24),
+                signingCredentials: creds);
+
+            return new JwtSecurityTokenHandler().WriteToken(token);
+        }
+
+        private int? GetCurrentUserId()
+        {
+            var userIdClaim = User.FindFirst("nameid") ?? User.FindFirst("sub");
+            if (userIdClaim != null && int.TryParse(userIdClaim.Value, out int userId))
+            {
+                return userId;
+            }
+            return null;
+        }
+
+
         private bool VerifyPassword(string password, string passwordHash)
         {
             using(var sha256 = SHA256.Create())
@@ -101,29 +142,6 @@ namespace PersonalDiary.API.Controllers
             }
         }
 
-        private string GenerateJwtToken(User user)
-        {
-            var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["JWT:Key"]));
-            var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
-
-            var claims = new[]
-            {
-                new Claim(JwtRegisteredClaimNames.Sub, user.Username),
-                new Claim(JwtRegisteredClaimNames.Email, user.Email),
-                new Claim("userId", user.UserId.ToString()),
-                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
-            };
-
-            var token = new JwtSecurityToken(
-                issuer: _configuration["JWT:Issuer"],
-                audience: _configuration["JWT:Audience"],
-                claims: claims,
-                expires: DateTime.Now.AddMinutes(Convert.ToDouble(_configuration["JWT:DurationInMinutes"])),
-                signingCredentials: credentials
-            );
-
-            return new JwtSecurityTokenHandler().WriteToken(token);
-        }
 
         private string HashPassword(string password)
         {

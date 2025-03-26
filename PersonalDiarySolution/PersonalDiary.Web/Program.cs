@@ -1,3 +1,6 @@
+using PersonalDiary.Web.Services;
+using PersonalDiary.Web.Services.Interface;
+
 namespace PersonalDiary.Web
 {
     public class Program
@@ -8,6 +11,22 @@ namespace PersonalDiary.Web
 
             // Add services to the container.
             builder.Services.AddControllersWithViews();
+
+            // Add HttpClientService
+            builder.Services.AddHttpClient();
+            builder.Services.AddScoped<IHttpClientService, HttpClientService>();
+
+            //add HttpContextAccessor
+            builder.Services.AddHttpContextAccessor();
+
+            //add session
+            builder.Services.AddDistributedMemoryCache();
+            builder.Services.AddSession(options =>
+            {
+                options.IdleTimeout = TimeSpan.FromMinutes(30);
+                options.Cookie.HttpOnly = true;
+                options.Cookie.IsEssential = true;
+            });
 
             var app = builder.Build();
 
@@ -25,6 +44,8 @@ namespace PersonalDiary.Web
             app.UseRouting();
 
             app.UseAuthorization();
+
+            app.UseSession();
 
             app.MapControllerRoute(
                 name: "default",

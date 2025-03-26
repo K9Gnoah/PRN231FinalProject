@@ -1,8 +1,123 @@
-﻿@{
-    ViewData["Title"] = "Home Page";
+﻿@model PersonalDiary.Web.Models.ViewModels.HomeViewModel
+@{
+    ViewData["Title"] = "Trang chủ";
 }
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://docs.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+<div class="row">
+    <div class="col-md-8">
+        <h1 class="display-4 mb-4">Nhật ký công khai</h1>
+
+        @if (!Model.PublicEntries.Any())
+        {
+            <div class="alert alert-info">
+                Chưa có bài viết công khai nào.
+            </div>
+        }
+        else
+        {
+            <div class="row">
+                @foreach (var entry in Model.PublicEntries)
+                {
+                    <div class="col-md-6 mb-4">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h5 class="card-title">@entry.Title</h5>
+                                <h6 class="card-subtitle mb-2 text-muted">
+                                    <i class="bi bi-person"></i> @entry.Username
+                                    <small class="ms-2">@entry.CreatedDate?.ToString("dd/MM/yyyy HH:mm")</small>
+                                </h6>
+                                <p class="card-text">
+                                    @(entry.Content?.Length > 100
+                                        ? entry.Content.Substring(0, 100) + "..."
+                                        : entry.Content)
+                                </p>
+
+                                @if (entry.TagNames.Any())
+                                {
+                                    <div class="mb-2">
+                                        @foreach (var tag in entry.TagNames)
+                                        {
+                                            <a asp-controller="Tag" asp-action="Entries"
+                                               asp-route-id="@Model.PopularTags.FirstOrDefault(t => t.TagName == tag)?.TagId"
+                                               class="badge bg-secondary text-decoration-none me-1">
+                                                #@tag
+                                            </a>
+                                        }
+                                    </div>
+                                }
+
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        @if (!string.IsNullOrEmpty(entry.Mood))
+                                        {
+                                            <span class="badge bg-primary me-1">@entry.Mood</span>
+                                        }
+                                        @if (!string.IsNullOrEmpty(entry.Weather))
+                                        {
+                                            <span class="badge bg-info me-1">@entry.Weather</span>
+                                        }
+                                    </div>
+                                    <a asp-controller="Diary" asp-action="Details" asp-route-id="@entry.EntryId"
+                                       class="btn btn-sm btn-outline-primary">
+                                        Xem chi tiết <i class="bi bi-chevron-right"></i>
+                                    </a>
+                                </div>
+                            </div>
+                            <div class="card-footer text-muted">
+                                <i class="bi bi-chat-dots"></i> @entry.CommentsCount bình luận
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Chủ đề phổ biến</h5>
+            </div>
+            <div class="card-body">
+                @if (!Model.PopularTags.Any())
+                {
+                    <p class="text-muted">Chưa có chủ đề nào.</p>
+                }
+                else
+                {
+                    <div class="d-flex flex-wrap gap-2">
+                        @foreach (var tag in Model.PopularTags)
+                        {
+                            <a asp-controller="Tag" asp-action="Entries" asp-route-id="@tag.TagId"
+                               class="badge bg-primary text-decoration-none p-2 fs-6">
+                                #@tag.TagName
+                            </a>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="mb-0">Về ứng dụng</h5>
+            </div>
+            <div class="card-body">
+                <p>Ứng dụng Nhật ký cá nhân giúp bạn lưu giữ những suy nghĩ, cảm xúc và trải nghiệm hàng ngày.</p>
+                <p>Bạn có thể lựa chọn chia sẻ một số bài viết với cộng đồng hoặc giữ riêng tư.</p>
+
+                @if (string.IsNullOrEmpty(Context.Session.GetString("JWTToken")))
+                {
+                    <div class="d-grid gap-2">
+                        <a asp-controller="Account" asp-action="Register" class="btn btn-primary">Đăng ký ngay</a>
+                        <a asp-controller="Account" asp-action="Login" class="btn btn-outline-secondary">Đăng nhập</a>
+                    </div>
+                }
+                else
+                {
+                    <a asp-controller="Diary" asp-action="Create" class="btn btn-primary d-block">Viết nhật ký mới</a>
+                }
+            </div>
+        </div>
+    </div>
 </div>

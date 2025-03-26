@@ -1,0 +1,55 @@
+﻿@model PersonalDiary.Web.Models.DTOs.DiaryEntryCreateDTO
+@{
+    ViewData["Title"] = "Tạo bài viết mới";
+}
+
+<h1>Tạo bài viết mới</h1>
+
+<hr />
+
+<form asp-action="Create" method="post">
+    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+    <div class="mb-3">
+        <label asp-for="Title" class="form-label">Tiêu đề</label>
+        <input asp-for="Title" class="form-control" />
+        <span asp-validation-for="Title" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="Content" class="form-label">Nội dung</label>
+        <textarea asp-for="Content" class="form-control" rows="10"></textarea>
+        <span asp-validation-for="Content" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="Mood" class="form-label">Tâm trạng</label>
+        <input asp-for="Mood" class="form-control" />
+        <span asp-validation-for="Mood" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="Weather" class="form-label">Thời tiết</label>
+        <input asp-for="Weather" class="form-control" />
+        <span asp-validation-for="Weather" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="TagNames" class="form-label">Tags (cách nhau bằng dấu phẩy)</label>
+        <input asp-for="TagNames" class="form-control" />
+        <span asp-validation-for="TagNames" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3 form-check">
+        <input asp-for="IsPublic" class="form-check-input" />
+        <label asp-for="IsPublic" class="form-check-label">Công khai</label>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Tạo bài viết</button>
+</form>
+
+@section Scripts {
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+}

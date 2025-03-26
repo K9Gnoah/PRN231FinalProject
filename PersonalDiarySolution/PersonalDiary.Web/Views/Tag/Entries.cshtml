@@ -1,0 +1,72 @@
+﻿@model IEnumerable<PersonalDiary.Web.Models.DTOs.DiaryEntryDTO>
+@{
+    ViewData["Title"] = "Bài viết theo thẻ";
+}
+
+<h1>Bài viết theo thẻ @ViewBag.TagName</h1>
+
+<hr />
+
+@if (!Model.Any())
+{
+    <div class="alert alert-info">
+        Chưa có bài viết nào với thẻ này.
+    </div>
+}
+else
+{
+    <div class="row">
+        @foreach (var entry in Model)
+        {
+            <div class="col-md-6 mb-4">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">@entry.Title</h5>
+                        <h6 class="card-subtitle mb-2 text-muted">
+                            <i class="bi bi-person"></i> @entry.Username
+                            <small class="ms-2">@entry.CreatedDate?.ToString("dd/MM/yyyy HH:mm")</small>
+                        </h6>
+                        <p class="card-text">
+                            @(entry.Content?.Length > 100
+                                ? entry.Content.Substring(0, 100) + "..."
+                                : entry.Content)
+                        </p>
+
+                        @if (entry.TagNames.Any())
+                        {
+                            <div class="mb-2">
+                                @foreach (var tag in entry.TagNames)
+                                {
+                                    <a asp-controller="Tag" asp-action="Entries" asp-route-id="@tag"
+                                       class="badge bg-secondary text-decoration-none me-1">
+                                        #@tag
+                                    </a>
+                                }
+                            </div>
+                        }
+
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                @if (!string.IsNullOrEmpty(entry.Mood))
+                                {
+                                    <span class="badge bg-primary me-1">@entry.Mood</span>
+                                }
+                                @if (!string.IsNullOrEmpty(entry.Weather))
+                                {
+                                    <span class="badge bg-info me-1">@entry.Weather</span>
+                                }
+                            </div>
+                            <a asp-controller="Diary" asp-action="Details" asp-route-id="@entry.EntryId"
+                               class="btn btn-sm btn-outline-primary">
+                                Xem chi tiết <i class="bi bi-chevron-right"></i>
+                            </a>
+                        </div>
+                    </div>
+                    <div class="card-footer text-muted">
+                        <i class="bi bi-chat-dots"></i> @entry.CommentsCount bình luận
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}

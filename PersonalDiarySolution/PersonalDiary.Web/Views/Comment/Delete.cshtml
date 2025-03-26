@@ -1,0 +1,20 @@
+﻿@model PersonalDiary.Web.Models.DTOs.CommentDTO
+@{
+    ViewData["Title"] = "Xóa bình luận";
+}
+
+<h1>Xóa bình luận</h1>
+
+<hr />
+
+<div class="alert alert-warning">
+    <p>Bạn có chắc chắn muốn xóa bình luận này không?</p>
+    <strong>@Model.Content</strong>
+</div>
+
+<form asp-action="Delete" method="post">
+    <input type="hidden" asp-for="CommentId" />
+    <input type="hidden" asp-for="EntryId" />
+    <button type="submit" class="btn btn-danger">Xóa</button>
+    <a asp-controller="Diary" asp-action="Details" asp-route-id="@Model.EntryId" class="btn btn-secondary">Hủy</a>
+</form>

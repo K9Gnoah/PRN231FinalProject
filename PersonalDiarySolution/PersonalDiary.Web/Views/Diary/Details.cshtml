@@ -1,0 +1,216 @@
+﻿@model PersonalDiary.Web.Models.ViewModels.DiaryEntryViewModel
+@{
+    ViewData["Title"] = Model.Entry.Title;
+}
+
+<div class="row">
+    <div class="col-md-8">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a asp-controller="Home" asp-action="Index">Trang chủ</a></li>
+                @if (Model.IsOwner)
+                {
+                    <li class="breadcrumb-item"><a asp-controller="Diary" asp-action="Index">Nhật ký của tôi</a></li>
+                }
+                <li class="breadcrumb-item active" aria-current="page">@Model.Entry.Title</li>
+            </ol>
+        </nav>
+        
+        <article class="mb-5">
+            <h1 class="mb-3">@Model.Entry.Title</h1>
+            
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <span class="text-muted me-2">
+                        <i class="bi bi-person"></i> @Model.Entry.Username
+                    </span>
+                    <span class="text-muted">
+                        <i class="bi bi-calendar"></i> @Model.Entry.CreatedDate?.ToString("dd/MM/yyyy HH:mm")
+                    </span>
+                    @if (Model.Entry.ModifiedDate.HasValue && Model.Entry.ModifiedDate != Model.Entry.CreatedDate)
+                    {
+                        <span class="text-muted ms-2">
+                            <small>(Đã chỉnh sửa: @Model.Entry.ModifiedDate?.ToString("dd/MM/yyyy HH:mm"))</small>
+                        </span>
+                    }
+                </div>
+                
+                @if (Model.IsOwner)
+                {
+                    <div>
+                        <a asp-controller="Diary" asp-action="Edit" asp-route-id="@Model.Entry.EntryId" 
+                           class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-pencil"></i> Sửa
+                        </a>
+                        <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteModal">
+                            <i class="bi bi-trash"></i> Xóa
+                        </button>
+                    </div>
+                }
+            </div>
+            
+            <div class="mb-3">
+                @if (!string.IsNullOrEmpty(Model.Entry.Mood))
+                {
+                    <span class="badge bg-primary me-1">
+                        <i class="bi bi-emoji-smile"></i> @Model.Entry.Mood
+                    </span>
+                }
+                @if (!string.IsNullOrEmpty(Model.Entry.Weather))
+                {
+                    <span class="badge bg-info text-dark me-1">
+                        <i class="bi bi-cloud"></i> @Model.Entry.Weather
+                    </span>
+                }
+                <span class="badge @(Model.Entry.IsPublic == true ? "bg-success" : "bg-secondary")">
+                    <i class="bi @(Model.Entry.IsPublic == true ? "bi-globe" : "bi-lock")"></i>
+                    @(Model.Entry.IsPublic == true ? "Công khai" : "Riêng tư")
+                </span>
+            </div>
+            
+            @if (Model.Entry.TagNames.Any())
+            {
+                <div class="mb-4">
+                    @foreach (var tag in Model.Entry.TagNames)
+                    {
+                        <a asp-controller="Tag" asp-action="Entries" asp-route-id="@tag"
+                           class="badge bg-secondary text-decoration-none me-1">
+                            #@tag
+                        </a>
+                    }
+                </div>
+            }
+            
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="entry-content">
+                        @Html.Raw(Model.Entry.Content?.Replace(Environment.NewLine, "<br />"))
+                    </div>
+                </div>
+            </div>
+            
+            <div class="comments-section">
+                <h3>Bình luận (@Model.Comments.Count)</h3>
+                
+                @if (Model.Entry.IsPublic == true)
+                {
+                    <div class="card mb-4">
+                        <div class="card-body">
+                            <form asp-controller="Comment" asp-action="Create" method="post">
+                                <input type="hidden" asp-for="NewComment.EntryId" value="@Model.Entry.EntryId" />
+                                
+                                @if (!Model.IsAuthenticated)
+                                {
+                                    <div class="mb-3">
+                                        <label for="GuestName" class="form-label">Tên của bạn</label>
+                                        <input type="text" class="form-control" id="GuestName" name="GuestName" required />
+                                    </div>
+                                }
+                                
+                                <div class="mb-3">
+                                    <label for="Content" class="form-label">Nội dung bình luận</label>
+                                    <textarea class="form-control" id="Content" name="Content" rows="3" required></textarea>
+                                </div>
+                                
+                                <button type="submit" class="btn btn-primary">Gửi bình luận</button>
+                            </form>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <div class="alert alert-secondary mb-4">
+                        <i class="bi bi-info-circle"></i> Bài viết riêng tư không cho phép bình luận.
+                    </div>
+                }
+                
+                @if (!Model.Comments.Any())
+                {
+                    <div class="alert alert-light">
+                        Chưa có bình luận nào.
+                    </div>
+                }
+                else
+                {
+                    <div class="list-group">
+                        @foreach (var comment in Model.Comments)
+                        {
+                            <div class="list-group-item">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <h6 class="mb-1">
+                                        <strong>@comment.AuthorName</strong>
+                                        <small class="text-muted ms-2">@comment.CreatedDate?.ToString("dd/MM/yyyy HH:mm")</small>
+                                    </h6>
+                                    
+                                    @if (comment.IsOwner || Model.IsOwner)
+                                    {
+                                        <form asp-controller="Comment" asp-action="Delete" method="post"
+                                              onsubmit="return confirm('Bạn có chắc muốn xóa bình luận này?');">
+                                            <input type="hidden" name="id" value="@comment.CommentId" />
+                                            <input type="hidden" name="entryId" value="@Model.Entry.EntryId" />
+                                            <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </form>
+                                    }
+                                </div>
+                                <p class="mb-1">@comment.Content</p>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </article>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card sticky-top" style="top: 20px">
+            <div class="card-header">
+                <h5 class="mb-0">Về tác giả</h5>
+            </div>
+            <div class="card-body">
+                <h5>@Model.Entry.Username</h5>
+                <p class="text-muted">
+                    <i class="bi bi-journal-text"></i> 
+                    Bài viết công khai: @(new Random().Next(5, 30)) <!-- Trong ứng dụng thực tế, lấy số lượng thực tế -->
+                </p>
+                
+                <hr />
+                
+                <h6>Bài viết khác của tác giả</h6>
+                <div class="list-group list-group-flush">
+                    <!-- Đây chỉ là dữ liệu giả, trong ứng dụng thực tế sẽ lấy từ API -->
+                    <a href="#" class="list-group-item list-group-item-action">Một ngày mới tuyệt vời</a>
+                    <a href="#" class="list-group-item list-group-item-action">Suy nghĩ về cuộc sống</a>
+                    <a href="#" class="list-group-item list-group-item-action">Chuyến đi Seoul</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal xác nhận xóa -->
+@if (Model.IsOwner)
+{
+    <div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="deleteModalLabel">Xác nhận xóa</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    Bạn có chắc chắn muốn xóa bài viết "<strong>@Model.Entry.Title</strong>"?
+                    <p class="text-danger mt-2">Hành động này không thể hoàn tác!</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                    <form asp-controller="Diary" asp-action="Delete" method="post">
+                        <input type="hidden" name="id" value="@Model.Entry.EntryId" />
+                        <button type="submit" class="btn btn-danger">Xác nhận xóa</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+}

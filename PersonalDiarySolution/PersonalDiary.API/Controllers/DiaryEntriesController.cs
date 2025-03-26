@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PersonalDiary.API.DTOs;
 using PersonalDiary.API.Models;
+using System.Security.Claims;
 
 namespace PersonalDiary.API.Controllers
 {
@@ -12,10 +13,11 @@ namespace PersonalDiary.API.Controllers
     public class DiaryEntriesController : ControllerBase
     {
         private readonly PersonalDiaryDBContext _context;
-
-        public DiaryEntriesController(PersonalDiaryDBContext context)
+        private readonly ILogger<DiaryEntriesController> _logger;
+        public DiaryEntriesController(PersonalDiaryDBContext context, ILogger<DiaryEntriesController> logger)
         {
             _context = context;
+            _logger = logger;
         }
 
         //get all diary entries public
@@ -48,7 +50,7 @@ namespace PersonalDiary.API.Controllers
             }));
         }
 
-        //get diary entry by id
+        // GET: api/DiaryEntries/{id}
         [HttpGet("{id}")]
         public async Task<ActionResult<DiaryEntryDTO>> GetDiaryEntry(int id)
         {
@@ -59,13 +61,15 @@ namespace PersonalDiary.API.Controllers
 
             if (entry == null)
             {
+                _logger.LogError("Diary entry with ID {id} not found", id);
                 return NotFound();
             }
 
-            //check ability to view entry
+            // Kiểm tra quyền xem bài viết
             var currentUserId = GetCurrentUserId();
             if (entry.IsPublic != true && (currentUserId == null || entry.UserId != currentUserId.Value))
             {
+                _logger.LogError("User {currentUserId} is not authorized to view diary entry with ID {id}", currentUserId, id);
                 return Forbid();
             }
 
@@ -128,67 +132,127 @@ namespace PersonalDiary.API.Controllers
         //post create new diary entry
         [Authorize]
         [HttpPost]
-        public async Task<ActionResult<DiaryEntryDTO>> CreateDiaryEntry(DiaryEntryDTO entryDTO)
+        public async Task<ActionResult<DiaryEntryDTO>> CreateDiaryEntry(DiaryEntryCreateDTO entryDto)
         {
-            var userId = GetCurrentUserId();
-            if (userId == null)
+            _logger.LogInformation("Request headers:");
+            foreach (var header in Request.Headers)
             {
-                return Unauthorized();
+                _logger.LogInformation("  {Key}: {Value}", header.Key, header.Value);
             }
-
-            var entry = new DiaryEntry
+            // Log tất cả các claims để kiểm tra
+            _logger.LogInformation("User authenticated: {IsAuthenticated}", User.Identity.IsAuthenticated);
+            if (User.Identity.IsAuthenticated)
             {
-                UserId = userId.Value,
-                Title = entryDTO.Title,
-                Content = entryDTO.Content,
-                CreatedDate = DateTime.Now,
-                Mood = entryDTO.Mood,
-                Weather = entryDTO.Weather,
-                IsPublic = entryDTO.IsPublic
-            };
-
-            if (entryDTO.TagNames != null && entryDTO.TagNames.Any())
-            {
-                foreach (var tagName in entryDTO.TagNames)
+                _logger.LogInformation("User claims:");
+                foreach (var claim in User.Claims)
                 {
-                    var tag = await _context.Tags.FirstOrDefaultAsync(t => t.TagName == tagName);
-                    if (tag == null)
-                    {
-                        tag = new Tag { TagName = tagName };
-                        _context.Tags.Add(tag);
-                        await _context.SaveChangesAsync();
-                    }
-
-                    entry.Tags.Add(tag);
+                    _logger.LogInformation("  {Type}: {Value}", claim.Type, claim.Value);
                 }
             }
 
-            _context.DiaryEntries.Add(entry);
-            await _context.SaveChangesAsync();
-
-            //get full information of created entry
-            var createdEntry = await _context.DiaryEntries
-                .Include(d => d.Tags)
-                .Include(d => d.User)                
-                .FirstOrDefaultAsync(d => d.EntryId == entry.EntryId);
-
-            var result = new DiaryEntryDTO
+            if (entryDto == null)
             {
-                EntryId = createdEntry.EntryId,
-                UserId = createdEntry.UserId,
-                Title = createdEntry.Title,
-                Content = createdEntry.Content,
-                CreatedDate = createdEntry.CreatedDate,
-                ModifiedDate = createdEntry.ModifiedDate,
-                Mood = createdEntry.Mood,
-                Weather = createdEntry.Weather,
-                IsPublic = createdEntry.IsPublic,
-                Username = createdEntry.User.Username,
-                TagNames = createdEntry.Tags.Select(t => t.TagName).ToList(),
-                CommentsCount = 0
-            };
+                _logger.LogError("Received null entryDto");
+                return BadRequest("Entry data is null");
+            }
 
-            return CreatedAtAction("GetDiaryEntry", new {id = result.EntryId }, result);
+            if (!ModelState.IsValid)
+            {
+                _logger.LogError("Invalid model state: {ModelState}", ModelState);
+                return BadRequest(ModelState);
+            }
+
+            try
+            {
+                // Lấy UserId từ claim
+                var userId = GetUserId();
+                if (userId == null)
+                {
+                    _logger.LogError("User ID not found in claims");
+                    return Unauthorized();
+                }
+
+                _logger.LogInformation("User ID found: {UserId}", userId);
+
+                var entry = new DiaryEntry
+                {
+                    UserId = userId.Value, // Sử dụng UserId từ claim
+                    Title = entryDto.Title,
+                    Content = entryDto.Content,
+                    CreatedDate = DateTime.Now,
+                    Mood = entryDto.Mood,
+                    Weather = entryDto.Weather,
+                    IsPublic = entryDto.IsPublic,
+                    Tags = new List<Tag>()
+                };
+
+                if (entryDto.TagNames != null && entryDto.TagNames.Any())
+                {
+                    foreach (var tagName in entryDto.TagNames)
+                    {
+                        var tag = await _context.Tags.FirstOrDefaultAsync(t => t.TagName == tagName);
+                        if (tag == null)
+                        {
+                            tag = new Tag { TagName = tagName };
+                            _context.Tags.Add(tag);
+                            await _context.SaveChangesAsync();
+                        }
+
+                        entry.Tags.Add(tag);
+                    }
+                }
+
+                _context.DiaryEntries.Add(entry);
+                await _context.SaveChangesAsync();
+
+                var createdEntry = await _context.DiaryEntries
+                    .Include(d => d.Tags)
+                    .Include(d => d.User)
+                    .FirstOrDefaultAsync(d => d.EntryId == entry.EntryId);
+
+                var result = new DiaryEntryDTO
+                {
+                    EntryId = createdEntry.EntryId,
+                    UserId = createdEntry.UserId,
+                    Title = createdEntry.Title,
+                    Content = createdEntry.Content,
+                    CreatedDate = createdEntry.CreatedDate,
+                    ModifiedDate = createdEntry.ModifiedDate,
+                    Mood = createdEntry.Mood,
+                    Weather = createdEntry.Weather,
+                    IsPublic = createdEntry.IsPublic,
+                    Username = createdEntry.User.Username,
+                    TagNames = createdEntry.Tags.Select(t => t.TagName).ToList(),
+                    CommentsCount = 0
+                };
+
+                return CreatedAtAction("GetDiaryEntry", new { id = result.EntryId }, result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error creating diary entry");
+                return StatusCode(500, "Internal server error");
+            }
+        }
+
+        private int? GetUserId()
+        {
+            var userIdClaim = User.FindFirst("nameid") ??
+                              User.FindFirst("userId") ??
+                              User.FindFirst(ClaimTypes.NameIdentifier) ??
+                              User.FindFirst("sub");
+
+            if (userIdClaim != null)
+            {
+                _logger.LogInformation("Found userId claim: {Type}={Value}", userIdClaim.Type, userIdClaim.Value);
+                if (int.TryParse(userIdClaim.Value, out int userId))
+                {
+                    return userId;
+                }
+            }
+
+            _logger.LogWarning("No valid userId claim found");
+            return null;
         }
 
         //update api PUT
