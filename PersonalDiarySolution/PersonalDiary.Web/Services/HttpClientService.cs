@@ -81,7 +81,26 @@ namespace PersonalDiary.Web.Services
             response.EnsureSuccessStatusCode();
 
             var content = await response.Content.ReadAsStringAsync();
+            Console.WriteLine($"GetCommentsByEntryAsync response: {content}"); 
             return JsonConvert.DeserializeObject<List<CommentDTO>>(content);
+        }
+
+        public async Task<bool> UpdateCommentAsync(int id, CommentUpdateDTO commentDto)
+        {
+            UpdateAuthorizationHeader();
+
+            var content = new StringContent(JsonConvert.SerializeObject(commentDto), Encoding.UTF8, "application/json");
+            var response = await _httpClient.PutAsync($"{_baseUrl}/Comments/{id}", content);
+
+            try
+            {
+                response.EnsureSuccessStatusCode();
+                return true;
+            }
+            catch (HttpRequestException)
+            {
+                return false;
+            }
         }
 
         public async Task<DiaryEntryDTO> GetDiaryEntryAsync(int id)
@@ -170,6 +189,7 @@ namespace PersonalDiary.Web.Services
         {
             throw new NotImplementedException();
         }
+
 
         public async Task UpdateDiaryEntryAsync(int id, DiaryEntryUpdateDTO entryDto)
         {

@@ -20,6 +20,7 @@ namespace PersonalDiary.Web.Services.Interface
         Task<List<CommentDTO>> GetCommentsByEntryAsync(int entryId);
         Task<CommentDTO> CreateCommentAsync(CommentCreateDTO commentDto);
         Task DeleteCommentAsync(int id);
+        Task<bool> UpdateCommentAsync(int id, CommentUpdateDTO commentDto);
 
         //tags
         Task<List<TagDTO>> GetTagsAsync();

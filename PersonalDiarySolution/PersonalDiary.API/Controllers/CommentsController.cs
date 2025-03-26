@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PersonalDiary.API.DTOs;
 using PersonalDiary.API.Models;
+using System.Security.Claims;
 
 namespace PersonalDiary.API.Controllers
 {
@@ -12,147 +13,234 @@ namespace PersonalDiary.API.Controllers
     public class CommentsController : ControllerBase
     {
         private readonly PersonalDiaryDBContext _context;
-        public CommentsController(PersonalDiaryDBContext context)
+        private readonly ILogger<CommentsController> _logger;
+        public CommentsController(PersonalDiaryDBContext context, ILogger<CommentsController> logger)
         {
             _context = context;
+            _logger = logger;
         }
 
         //get by entry id
-        [HttpGet("entr/{entryId}")]
+        [HttpGet("entry/{entryId}")]
         public async Task<ActionResult<IEnumerable<CommentDTO>>> GetCommentsByEntry(int entryId)
         {
-            var currentUserId = GetCurrentUserId();
-            var entry = await _context.DiaryEntries.FindAsync(entryId);
-            if (entry == null)
+            try
             {
-                return NotFound("The post does not exist");
-            }
-
-            //check ability to view post if it is private
-            if (entry.IsPublic != true)
-            {
-                if (currentUserId == null || entry.UserId != currentUserId.Value)
+                var entry = await _context.DiaryEntries.FindAsync(entryId);
+                if (entry == null)
                 {
-                    return Forbid();
+                    return NotFound("The post does not exist");
                 }
+
+                //check ability to view post if it is private
+                if ((bool)!entry.IsPublic)
+                {
+                    var currentUserId = GetCurrentUserId();
+                    if (currentUserId == null || entry.UserId != currentUserId.Value)
+                    {
+                        return Forbid();
+                    }
+                }
+
+                var comments = await _context.Comments
+                        .Where(c => c.EntryId == entryId)
+                        .Include(c => c.User)
+                        .OrderByDescending(c => c.CreatedDate)
+                        .ToListAsync();
+
+                var commentDtos = comments.Select(c => new CommentDTO
+                {
+                    CommentId = c.CommentId,
+                    EntryId = c.EntryId,
+                    UserId = c.UserId,
+                    Username = c.User.Username,
+                    Content = c.Content,
+                    CreatedDate = (DateTime)c.CreatedDate,
+                }).ToList();
+
+                return Ok(commentDtos);
             }
-
-            var comments = await _context.Comments
-                    .Include(c => c.User)
-                    .Where(c => c.EntryId == entryId)
-                    .OrderByDescending(c => c.CreatedDate)
-                    .ToListAsync();
-
-            var result = comments.Select(c => new CommentDTO
+            catch(Exception ex)
             {
-                CommentId = c.CommentId,
-                EntryId = c.EntryId,
-                UserId = c.UserId,
-                AuthorName = c.UserId.HasValue ? c.User.Username : c.GuestName,
-                Content = c.Content,
-                CreatedDate = c.CreatedDate,
-                IsOwner = c.UserId.HasValue && currentUserId.HasValue && c.UserId.Value == currentUserId.Value
-            });
-
-            return Ok(result);
+                _logger.LogError(ex, "Error while getting comments for entry {EntryId}", entryId);
+                return StatusCode(500, "Internal server error");
+            }
         }
 
         //post api/comments
         [HttpPost]
         public async Task<ActionResult<CommentDTO>> CreateComment(CommentCreateDTO commentDto)
         {
-            var entry = await _context.DiaryEntries.FindAsync(commentDto.EntryId);
-            if (entry == null)
+            try
             {
-                return NotFound("The post is not exist");
-            }
-
-            //check if post public or not
-            if (entry.IsPublic != true)
-            {
-                return BadRequest("Cannot comment in private post");
-            }
-
-            var comment = new Comment
-            {
-                EntryId = commentDto.EntryId,
-                Content = commentDto.Content,
-                CreatedDate = DateTime.Now
-            };
-
-            //check if commenter is user or guest
-            var currentUserId = GetCurrentUserId();
-            if (currentUserId != null)
-            {
-                comment.UserId = currentUserId.Value;
-            }
-            else
-            {
-                //if guest, must provide guest name
-                if (string.IsNullOrWhiteSpace(commentDto.GuestName))
+                //check entry exist
+                var entry = await _context.DiaryEntries.FindAsync(commentDto.EntryId);
+                if(entry == null)
                 {
-                    return BadRequest("Guest name is required for comment");
+                    return NotFound("Diary entry not found");
                 }
-                comment.GuestName = commentDto.GuestName;
+
+                //check entry is public
+                if ((bool)!entry.IsPublic)
+                {
+                    var userId = GetCurrentUserId();
+                    if(userId == null)
+                    {
+                        return Forbid("Only logged-in user can comment on private post");
+                    }
+
+                    if(entry.UserId != userId.Value)
+                    {
+                        return Forbid("You can only comment on your own entries or public entries");
+                    }
+                }
+
+                var currentUserId = GetCurrentUserId();
+
+                var comment = new Comment
+                {
+                    EntryId = commentDto.EntryId,
+                    UserId = currentUserId,
+                    GuestName = currentUserId == null ?
+                    (string.IsNullOrEmpty(commentDto.GuestName) ? "Guest" : commentDto.GuestName) : null,
+                    Content = commentDto.Content,
+                    CreatedDate = DateTime.Now
+                };
+
+                //validate guest must have guest name
+                if(currentUserId == null && string.IsNullOrEmpty(commentDto.GuestName))
+                {
+                    ModelState.AddModelError("GuestName", "Guest name is required for non-logged-in users");
+                    return BadRequest(ModelState);
+                }
+
+                _context.Comments.Add(comment);
+                await _context.SaveChangesAsync();
+
+                //load user information if available
+                if (comment.UserId.HasValue)
+                {
+                    await _context.Entry(comment).Reference(c => c.User).LoadAsync();
+                }
+
+                var createdCommentDto = new CommentDTO
+                {
+                    CommentId = comment.CommentId,
+                    EntryId = comment.EntryId,
+                    UserId = comment.UserId,
+                    Username = comment.UserId.HasValue ? comment.User?.Username : comment.GuestName,
+                    IsGuest = !comment.UserId.HasValue,
+                    Content = comment.Content,
+                    CreatedDate = (DateTime)comment.CreatedDate,
+                };
+
+                return CreatedAtAction(nameof(GetCommentsByEntry), new { entryId = comment.EntryId }, createdCommentDto);
             }
-
-            _context.Comments.Add(comment);
-            await _context.SaveChangesAsync();
-
-            //get full information about cmt after create cmt
-            var createdComment = await _context.Comments
-                .Include(c => c.User)
-                .FirstOrDefaultAsync(c => c.CommentId == comment.CommentId);
-
-            var result = new CommentDTO
+            catch (Exception ex)
             {
-                CommentId = createdComment.CommentId,
-                EntryId = createdComment.EntryId,
-                UserId = createdComment.UserId,
-                AuthorName = createdComment.UserId.HasValue ? createdComment.User.Username : createdComment.GuestName,
-                Content = createdComment.Content,
-                CreatedDate = createdComment.CreatedDate,
-                IsOwner = createdComment.UserId.HasValue && currentUserId.HasValue && createdComment.UserId.Value == currentUserId.Value
-            };
-
-            return CreatedAtAction("GetCommentsByEntry", new { entryId = result.EntryId }, result);
+                _logger.LogError(ex, "Error creating comment");
+                return StatusCode(500, "Internal server error");
+            }
         }
+
+        //Put: api/comments/{id}
+        [Authorize]
+        [HttpPut("{id}")]
+        public async Task<IActionResult> UpdateComment(int id, CommentUpdateDTO commentDto)
+        {
+            try
+            {
+                var userId = GetCurrentUserId();
+                if (userId == null)
+                {
+                    return Unauthorized();
+                }
+
+                var comment = await _context.Comments.FindAsync(id);
+                if (comment == null)
+                {
+                    return NotFound("Comment not found");
+                }
+
+                // Chỉ người tạo comment mới có thể sửa
+                if (!comment.UserId.HasValue || comment.UserId.Value != userId.Value)
+                {
+                    return Forbid();
+                }
+
+                comment.Content = commentDto.Content;
+
+                _context.Entry(comment).State = EntityState.Modified;
+                await _context.SaveChangesAsync();
+
+                return NoContent();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating comment {CommentId}", id);
+                return StatusCode(500, "Internal server error");
+            }
+        }
+
 
         //Delete api/comments/{id}
         [Authorize]
         [HttpDelete("{id}")]
-        public async Task<ActionResult> DeleteComment(int id)
+        public async Task<IActionResult> DeleteComment(int id)
         {
-            var comment =await _context.Comments.FindAsync(id);
-            if(comment == null)
+            try
             {
-                return NotFound();
-            }
+                var userId = GetCurrentUserId();
+                if (userId == null)
+                {
+                    return Unauthorized();
+                }
 
-            //check login
-            var currentUserId = GetCurrentUserId();
-            if (currentUserId == null)
+                var comment = await _context.Comments.FindAsync(id);
+                if (comment == null)
+                {
+                    return NotFound("Comment not found");
+                }
+
+                // Kiểm tra xem entry có tồn tại không
+                var entry = await _context.DiaryEntries.FindAsync(comment.EntryId);
+                if (entry == null)
+                {
+                    return NotFound("Diary entry not found");
+                }
+
+                // Người tạo comment hoặc chủ nhân entry mới có thể xóa comment
+                if ((!comment.UserId.HasValue || comment.UserId.Value != userId.Value) && entry.UserId != userId.Value)
+                {
+                    return Forbid();
+                }
+
+                _context.Comments.Remove(comment);
+                await _context.SaveChangesAsync();
+
+                return NoContent();
+            }
+            catch (Exception ex)
             {
-                return Unauthorized();
+                _logger.LogError(ex, "Error deleting comment {CommentId}", id);
+                return StatusCode(500, "Internal server error");
             }
-
-            //allow delete if user is owner of comment
-            var entry = await _context.DiaryEntries.FindAsync(comment.EntryId);
-            if((comment.UserId != currentUserId) && (entry.UserId != currentUserId))
-            {
-                return Forbid();
-            }
-
-            _context.Comments.Remove(comment);
-            await _context.SaveChangesAsync();
-
-            return NoContent();
         }
+
 
         private int? GetCurrentUserId()
         {
-            var userIdClaim = User.FindFirst("userId");
-            if(userIdClaim != null && int.TryParse(userIdClaim.Value, out int userId))
+            if (!User.Identity.IsAuthenticated)
+            {
+                return null;
+            }
+
+            var userIdClaim = User.FindFirst("userId") ??
+                             User.FindFirst("nameid") ??
+                             User.FindFirst(ClaimTypes.NameIdentifier) ??
+                             User.FindFirst("sub");
+
+            if (userIdClaim != null && int.TryParse(userIdClaim.Value, out int userId))
             {
                 return userId;
             }

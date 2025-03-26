@@ -78,11 +78,11 @@ namespace PersonalDiary.API.Controllers
                 UserId = entry.UserId,
                 Title = entry.Title,
                 Content = entry.Content,
-                CreatedDate = entry.CreatedDate,
+                CreatedDate = (DateTime)entry.CreatedDate,
                 ModifiedDate = entry.ModifiedDate,
                 Mood = entry.Mood,
                 Weather = entry.Weather,
-                IsPublic = entry.IsPublic,
+                IsPublic = (bool)entry.IsPublic,
                 Username = entry.User.Username,
                 TagNames = entry.Tags.Select(t => t.TagName).ToList(),
                 CommentsCount = entry.Comments.Count

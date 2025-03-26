@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using PersonalDiary.API.DTOs;
 using PersonalDiary.API.Models;
 using System.Security.Claims;
+using System.Xml.Linq;
 
 namespace PersonalDiary.API.Controllers
 {
@@ -39,11 +40,11 @@ namespace PersonalDiary.API.Controllers
                 UserId = entry.UserId,
                 Title = entry.Title,
                 Content = entry.Content,
-                CreatedDate = entry.CreatedDate,
+                CreatedDate = (DateTime)entry.CreatedDate,
                 ModifiedDate = entry.ModifiedDate,
                 Mood = entry.Mood,
                 Weather = entry.Weather,
-                IsPublic = entry.IsPublic,
+                IsPublic = (bool)entry.IsPublic,
                 Username = entry.User.Username,
                 TagNames = entry.Tags.Select(t => t.TagName).ToList(),
                 CommentsCount = entry.Comments.Count
@@ -54,42 +55,69 @@ namespace PersonalDiary.API.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<DiaryEntryDTO>> GetDiaryEntry(int id)
         {
-            var entry = await _context.DiaryEntries
+            try
+            {
+                var entry = await _context.DiaryEntries
                 .Include(d => d.User)
                 .Include(d => d.Tags)
                 .FirstOrDefaultAsync(d => d.EntryId == id);
 
-            if (entry == null)
-            {
-                _logger.LogError("Diary entry with ID {id} not found", id);
-                return NotFound();
+                if (entry == null)
+                {
+                    _logger.LogError("Diary entry with ID {id} not found", id);
+                    return NotFound();
+                }
+
+                // Kiểm tra quyền xem bài viết
+                var currentUserId = GetCurrentUserId();
+                if (entry.IsPublic != true && (currentUserId == null || entry.UserId != currentUserId.Value))
+                {
+                    _logger.LogError("User {currentUserId} is not authorized to view diary entry with ID {id}", currentUserId, id);
+                    return Forbid();
+                }
+
+                var commentCount = await _context.Comments.CountAsync(c => c.EntryId == id);
+                //get comment 
+                var comments = await _context.Comments
+                    .Where(c => c.EntryId == id)
+                    .Include(c => c.User)
+                    .OrderByDescending(c => c.CreatedDate)
+                    .ToListAsync();
+
+                var commentDtos = comments.Select(c => new CommentDTO
+                {
+                    CommentId = c.CommentId,
+                    EntryId = c.EntryId,
+                    UserId = c.UserId,
+                    Username = c.UserId.HasValue ? c.User?.Username : c.GuestName,
+                    IsGuest = !c.UserId.HasValue,
+                    Content = c.Content,
+                    CreatedDate = (DateTime)c.CreatedDate,
+                }).ToList();
+
+
+                return new DiaryEntryDetailDTO
+                {
+                    EntryId = entry.EntryId,
+                    UserId = entry.UserId,
+                    Title = entry.Title,
+                    Content = entry.Content,
+                    CreatedDate = (DateTime)entry.CreatedDate,
+                    ModifiedDate = entry.ModifiedDate,
+                    Mood = entry.Mood,
+                    Weather = entry.Weather,
+                    IsPublic = (bool)entry.IsPublic,
+                    Username = entry.User.Username,
+                    TagNames = entry.Tags.Select(t => t.TagName).ToList(),
+                    Comments = commentDtos,
+                    CommentsCount = commentDtos.Count
+                };
             }
-
-            // Kiểm tra quyền xem bài viết
-            var currentUserId = GetCurrentUserId();
-            if (entry.IsPublic != true && (currentUserId == null || entry.UserId != currentUserId.Value))
+            catch (Exception ex)
             {
-                _logger.LogError("User {currentUserId} is not authorized to view diary entry with ID {id}", currentUserId, id);
-                return Forbid();
+                _logger.LogError(ex, "Error getting diary entry with ID {id}", id);
+                return StatusCode(500, "Internal server error");
             }
-
-            var commentCount = await _context.Comments.CountAsync(c => c.EntryId == id);
-
-            return new DiaryEntryDTO
-            {
-                EntryId = entry.EntryId,
-                UserId = entry.UserId,
-                Title = entry.Title,
-                Content = entry.Content,
-                CreatedDate = entry.CreatedDate,
-                ModifiedDate = entry.ModifiedDate,
-                Mood = entry.Mood,
-                Weather = entry.Weather,
-                IsPublic = entry.IsPublic,
-                Username = entry.User.Username,
-                TagNames = entry.Tags.Select(t => t.TagName).ToList(),
-                CommentsCount = commentCount
-            };
         }
 
         //get diary entries by user owner
@@ -116,11 +144,11 @@ namespace PersonalDiary.API.Controllers
                 UserId = entry.UserId,
                 Title = entry.Title,
                 Content = entry.Content,
-                CreatedDate = entry.CreatedDate,
+                CreatedDate = (DateTime)entry.CreatedDate,
                 ModifiedDate = entry.ModifiedDate,
                 Mood = entry.Mood,
                 Weather = entry.Weather,
-                IsPublic = entry.IsPublic,
+                IsPublic = (bool)entry.IsPublic,
                 Username = entry.User.Username,
                 TagNames = entry.Tags.Select(t => t.TagName).ToList(),
                 CommentsCount = _context.Comments.Count(c => c.EntryId == entry.EntryId)
@@ -216,11 +244,11 @@ namespace PersonalDiary.API.Controllers
                     UserId = createdEntry.UserId,
                     Title = createdEntry.Title,
                     Content = createdEntry.Content,
-                    CreatedDate = createdEntry.CreatedDate,
+                    CreatedDate = (DateTime)createdEntry.CreatedDate,
                     ModifiedDate = createdEntry.ModifiedDate,
                     Mood = createdEntry.Mood,
                     Weather = createdEntry.Weather,
-                    IsPublic = createdEntry.IsPublic,
+                    IsPublic = (bool)createdEntry.IsPublic,
                     Username = createdEntry.User.Username,
                     TagNames = createdEntry.Tags.Select(t => t.TagName).ToList(),
                     CommentsCount = 0
