@@ -26,5 +26,9 @@ namespace PersonalDiary.Web.Services.Interface
         Task<List<TagDTO>> GetTagsAsync();
         Task<List<TagDTO>> GetPopularTagsAsync(int count = 10);
         Task<List<DiaryEntryDTO>> GetEntriesByTagAsync(int tagId);
+
+        Task<int> GetPublicEntryCountByUsernameAsync(string username);
+        Task<List<DiaryEntryDTO>> GetOtherPublicEntriesByUsernameAsync(string username, int currentEntryId, int limit = 3);
+        Task<(int publicCount, List<DiaryEntryDTO> otherEntries)> GetAuthorInfoAsync(string username, int currentEntryId, int limit = 3);
     }
 }

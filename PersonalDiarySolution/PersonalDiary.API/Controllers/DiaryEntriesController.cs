@@ -374,6 +374,77 @@ namespace PersonalDiary.API.Controllers
             return NoContent();
         }
 
+        // GET: api/DiaryEntries/count/public/{username}
+        [HttpGet("count/public/{username}")]
+        public async Task<ActionResult<int>> GetPublicEntryCountByUsername(string username)
+        {
+            try
+            {
+                var user = await _context.Users.FirstOrDefaultAsync(u => u.Username == username);
+                if (user == null)
+                {
+                    return NotFound("User not found");
+                }
+
+                var count = await _context.DiaryEntries
+                    .Where(e => e.UserId == user.UserId && e.IsPublic == true)
+                    .CountAsync();
+
+                return Ok(count);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting public entry count for user {Username}", username);
+                return StatusCode(500, "Internal server error");
+            }
+        }
+
+        // GET: api/DiaryEntries/public/{username}?excludeId={id}&limit={limit}
+        [HttpGet("public/{username}")]
+        public async Task<ActionResult<IEnumerable<DiaryEntryDTO>>> GetOtherPublicEntriesByUsername(
+            string username,
+            [FromQuery] int? excludeId = null,
+            [FromQuery] int limit = 3)
+        {
+            try
+            {
+                var user = await _context.Users.FirstOrDefaultAsync(u => u.Username == username);
+                if (user == null)
+                {
+                    return NotFound("User not found");
+                }
+
+                var query = _context.DiaryEntries
+                    .Where(e => e.UserId == user.UserId && e.IsPublic == true);
+
+                if (excludeId.HasValue)
+                {
+                    query = query.Where(e => e.EntryId != excludeId.Value);
+                }
+
+                var entries = await query
+                    .OrderByDescending(e => e.CreatedDate)
+                    .Take(limit)
+                    .ToListAsync();
+
+                var entryDtos = entries.Select(e => new DiaryEntryDTO
+                {
+                    EntryId = e.EntryId,
+                    Title = e.Title,
+                    Content = e.Content,
+                    CreatedDate = (DateTime)e.CreatedDate,
+                    // Các trường khác cần thiết
+                }).ToList();
+
+                return Ok(entryDtos);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting other public entries for user {Username}", username);
+                return StatusCode(500, "Internal server error");
+            }
+        }
+
         private int? GetCurrentUserId()
         {
             var userIdClaim = User.FindFirst("userId");

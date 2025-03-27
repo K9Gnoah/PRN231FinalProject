@@ -53,14 +53,20 @@ namespace PersonalDiary.API.Controllers
                     CommentId = c.CommentId,
                     EntryId = c.EntryId,
                     UserId = c.UserId,
-                    Username = c.User.Username,
+                    // Xử lý trường hợp User là null bằng toán tử điều kiện
+                    // Nếu c.User không null, lấy c.User.Username, nếu null, lấy c.GuestName (hoặc "Guest" nếu GuestName cũng null)
+                    Username = c.User != null ? c.User.Username : (c.GuestName ?? "Guest"),
+                    // Hoặc có thể viết ngắn gọn hơn: Username = c.User?.Username ?? c.GuestName ?? "Guest",
+                    IsGuest = !c.UserId.HasValue, // Thêm trường để biết đây là khách hay người dùng đăng nhập
                     Content = c.Content,
                     CreatedDate = (DateTime)c.CreatedDate,
+                    // Cập nhật IsOwner để biết người xem hiện tại có phải chủ sở hữu không
+                    IsOwner = c.UserId.HasValue && c.UserId == GetCurrentUserId()
                 }).ToList();
 
                 return Ok(commentDtos);
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 _logger.LogError(ex, "Error while getting comments for entry {EntryId}", entryId);
                 return StatusCode(500, "Internal server error");

@@ -42,14 +42,21 @@ namespace PersonalDiary.Web.Controllers
             {
                 var entry = await _httpClientService.GetDiaryEntryAsync(id);
                 var comments = await _httpClientService.GetCommentsByEntryAsync(id);
+               
+                var (publicCount, otherEntries) = await _httpClientService.GetAuthorInfoAsync(
+                    entry.Username,
+                    entry.EntryId
+                );
 
                 var viewModel = new DiaryEntryViewModel
                 {
                     Entry = entry,
                     Comments = comments,
-                    NewComment = new CommentCreateDTO { EntryId = id },
+                    NewComment = new CommentCreateDTO { entryId = id },
                     IsAuthenticated = !string.IsNullOrEmpty(HttpContext.Session.GetString("JWTToken")),
-                    IsOwner = entry.Username == HttpContext.Session.GetString("Username")
+                    IsOwner = entry.Username == HttpContext.Session.GetString("Username"),
+                    PublicPostCount = publicCount,
+                    OtherEntries = otherEntries
                 };
 
                 return View(viewModel);
@@ -201,5 +208,7 @@ namespace PersonalDiary.Web.Controllers
                 return RedirectToAction(nameof(Details), new { id });
             }
         }
+
+
     }
 }

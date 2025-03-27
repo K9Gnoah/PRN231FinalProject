@@ -9,5 +9,8 @@ namespace PersonalDiary.Web.Models.ViewModels
         public CommentCreateDTO NewComment { get; set; } = new CommentCreateDTO();
         public bool IsAuthenticated { get; set; }
         public bool IsOwner { get; set; }
+
+        public int PublicPostCount { get; set; }
+        public List<DiaryEntryDTO> OtherEntries { get; set; } = new List<DiaryEntryDTO>();
     }
 }

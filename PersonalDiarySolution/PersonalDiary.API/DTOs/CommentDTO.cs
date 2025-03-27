@@ -7,10 +7,11 @@ namespace PersonalDiary.API.DTOs
         public int CommentId { get; set; }
         public int EntryId { get; set; }
         public int? UserId { get; set; }
-        public string Username { get; set; }
+        public string Username { get; set; } 
         public bool IsGuest { get; set; }
-        public string Content { get; set; } 
+        public string Content { get; set; }
         public DateTime CreatedDate { get; set; }
+        public bool IsOwner { get; set; }
     }
 
     public class CommentCreateDTO

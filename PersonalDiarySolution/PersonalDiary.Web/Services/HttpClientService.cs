@@ -1,4 +1,5 @@
 ﻿using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using PersonalDiary.Web.Models.DTOs;
 using PersonalDiary.Web.Services.Interface;
 using System.Net.Http.Headers;
@@ -30,15 +31,47 @@ namespace PersonalDiary.Web.Services
 
         public async Task<CommentDTO> CreateCommentAsync(CommentCreateDTO commentDto)
         {
-            //add token to header
-            UpdateAuthorizationHeader();
+            try
+            {
+                // Add token to header
+                UpdateAuthorizationHeader();
 
-            var content = new StringContent(JsonConvert.SerializeObject(commentDto), Encoding.UTF8, "application/json");
-            var response = await _httpClient.PostAsync($"{_baseUrl}/Comments", content);
-            response.EnsureSuccessStatusCode();
+                // Debug: Log token và auth header
+                var token = _httpContextAccessor.HttpContext?.Session.GetString("JWTToken");
+                Console.WriteLine($"Token exists: {!string.IsNullOrEmpty(token)}");
+                Console.WriteLine($"Authorization header: {_httpClient.DefaultRequestHeaders.Authorization}");
 
-            var responseContent = await response.Content.ReadAsStringAsync();
-            return JsonConvert.DeserializeObject<CommentDTO>(responseContent);
+                // Debug: Kiểm tra trạng thái của commentDto trước khi gửi
+                Console.WriteLine($"CommentDTO: EntryId={commentDto.entryId}, Content={commentDto.content}, GuestName={commentDto.guestName ?? "null"}");
+
+                // Nếu người dùng đã đăng nhập nhưng GuestName vẫn bị yêu cầu, hãy thêm dòng này:
+                if (string.IsNullOrEmpty(commentDto.guestName) && !string.IsNullOrEmpty(token))
+                {
+                    commentDto.guestName = "LoggedInUser"; // Một giá trị giả để tránh validation error
+                }
+
+                var jsonContent = JsonConvert.SerializeObject(commentDto);
+                Console.WriteLine($"Sending JSON: {jsonContent}");
+
+                var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+                var response = await _httpClient.PostAsync($"{_baseUrl}/Comments", content);
+
+                var responseContent = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"Response status: {(int)response.StatusCode} {response.StatusCode}");
+                Console.WriteLine($"Response content: {responseContent}");
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    throw new HttpRequestException($"API Error: {responseContent}");
+                }
+
+                return JsonConvert.DeserializeObject<CommentDTO>(responseContent);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Exception in CreateCommentAsync: {ex.Message}");
+                throw;
+            }
         }
 
         public async Task<DiaryEntryDTO> CreateDiaryEntryAsync(DiaryEntryCreateDTO entryDto)
@@ -77,12 +110,41 @@ namespace PersonalDiary.Web.Services
 
         public async Task<List<CommentDTO>> GetCommentsByEntryAsync(int entryId)
         {
-            var response = await _httpClient.GetAsync($"{_baseUrl}/Comments/entry/{entryId}");
-            response.EnsureSuccessStatusCode();
+            try
+            {
+                var response = await _httpClient.GetAsync($"{_baseUrl}/Comments/entry/{entryId}");
+                response.EnsureSuccessStatusCode();
 
-            var content = await response.Content.ReadAsStringAsync();
-            Console.WriteLine($"GetCommentsByEntryAsync response: {content}"); 
-            return JsonConvert.DeserializeObject<List<CommentDTO>>(content);
+                var content = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"GetCommentsByEntryAsync response: {content}");
+
+                // Deserialize với setting để debug
+                var settings = new JsonSerializerSettings
+                {
+                    MissingMemberHandling = MissingMemberHandling.Ignore,
+                    NullValueHandling = NullValueHandling.Include
+                };
+
+                // Thêm bước này để xem JSON trả về có cấu trúc gì
+                // Deserialize thành dynamic trước để xem cấu trúc
+                var dynamicResponse = JsonConvert.DeserializeObject<dynamic>(content);
+                foreach (var item in dynamicResponse)
+                {
+                    Console.WriteLine("JSON Properties:");
+                    foreach (var prop in ((JObject)item).Properties())
+                    {
+                        Console.WriteLine($"  {prop.Name}: {prop.Value}");
+                    }
+                }
+
+                var comments = JsonConvert.DeserializeObject<List<CommentDTO>>(content, settings);
+                return comments;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in GetCommentsByEntryAsync: {ex.Message}");
+                throw;
+            }
         }
 
         public async Task<bool> UpdateCommentAsync(int id, CommentUpdateDTO commentDto)
@@ -204,13 +266,77 @@ namespace PersonalDiary.Web.Services
         private void UpdateAuthorizationHeader()
         {
             var token = _httpContextAccessor.HttpContext?.Session.GetString("JWTToken");
+            Console.WriteLine($"Updating auth header with token: {!string.IsNullOrEmpty(token)}");
+
             if (!string.IsNullOrEmpty(token))
             {
-                if(_httpClient.DefaultRequestHeaders.Contains("Authorization"))
+                // Xóa header cũ trước khi thêm mới
+                if (_httpClient.DefaultRequestHeaders.Contains("Authorization"))
                 {
                     _httpClient.DefaultRequestHeaders.Remove("Authorization");
                 }
+
+                // Thêm header mới đảm bảo đúng format "Bearer {token}"
                 _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {token}");
+
+                // Kiểm tra lại để xác nhận header đã được thêm đúng
+                Console.WriteLine($"Header after update: {_httpClient.DefaultRequestHeaders.Authorization}");
+            }
+            else
+            {
+                Console.WriteLine("No token found in session, request will be sent without authentication");
+            }
+        }
+
+        public async Task<int> GetPublicEntryCountByUsernameAsync(string username)
+        {
+            try
+            {
+                var response = await _httpClient.GetAsync($"{_baseUrl}/DiaryEntries/count/public/{username}");
+                response.EnsureSuccessStatusCode();
+
+                var content = await response.Content.ReadAsStringAsync();
+                return int.Parse(content);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in GetPublicEntryCountByUsernameAsync: {ex.Message}");
+                return 0; 
+            }
+        }
+
+        public async Task<List<DiaryEntryDTO>> GetOtherPublicEntriesByUsernameAsync(string username, int currentEntryId, int limit = 3)
+        {
+            try
+            {
+                var response = await _httpClient.GetAsync($"{_baseUrl}/DiaryEntries/public/{username}?excludeId={currentEntryId}&limit={limit}");
+                response.EnsureSuccessStatusCode();
+
+                var content = await response.Content.ReadAsStringAsync();
+                return JsonConvert.DeserializeObject<List<DiaryEntryDTO>>(content) ?? new List<DiaryEntryDTO>();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in GetOtherPublicEntriesByUsernameAsync: {ex.Message}");
+                return new List<DiaryEntryDTO>(); 
+            }
+        }
+
+        public async Task<(int publicCount, List<DiaryEntryDTO> otherEntries)> GetAuthorInfoAsync(string username, int currentEntryId, int limit = 3)
+        {
+            try
+            {
+                var countTask = GetPublicEntryCountByUsernameAsync(username);
+                var entriesTask = GetOtherPublicEntriesByUsernameAsync(username, currentEntryId, limit);
+
+                await Task.WhenAll(countTask, entriesTask);
+
+                return (countTask.Result, entriesTask.Result);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in GetAuthorInfoAsync: {ex.Message}");
+                return (0, new List<DiaryEntryDTO>());
             }
         }
     }
