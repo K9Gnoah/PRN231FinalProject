@@ -53,10 +53,8 @@ namespace PersonalDiary.API.Controllers
                     CommentId = c.CommentId,
                     EntryId = c.EntryId,
                     UserId = c.UserId,
-                    // Xử lý trường hợp User là null bằng toán tử điều kiện
-                    // Nếu c.User không null, lấy c.User.Username, nếu null, lấy c.GuestName (hoặc "Guest" nếu GuestName cũng null)
+                    //check username null
                     Username = c.User != null ? c.User.Username : (c.GuestName ?? "Guest"),
-                    // Hoặc có thể viết ngắn gọn hơn: Username = c.User?.Username ?? c.GuestName ?? "Guest",
                     IsGuest = !c.UserId.HasValue, // Thêm trường để biết đây là khách hay người dùng đăng nhập
                     Content = c.Content,
                     CreatedDate = (DateTime)c.CreatedDate,
@@ -168,7 +166,7 @@ namespace PersonalDiary.API.Controllers
                     return NotFound("Comment not found");
                 }
 
-                // Chỉ người tạo comment mới có thể sửa
+                // check only creater cmt can edit
                 if (!comment.UserId.HasValue || comment.UserId.Value != userId.Value)
                 {
                     return Forbid();
@@ -208,14 +206,14 @@ namespace PersonalDiary.API.Controllers
                     return NotFound("Comment not found");
                 }
 
-                // Kiểm tra xem entry có tồn tại không
+                // check entry exist
                 var entry = await _context.DiaryEntries.FindAsync(comment.EntryId);
                 if (entry == null)
                 {
                     return NotFound("Diary entry not found");
                 }
 
-                // Người tạo comment hoặc chủ nhân entry mới có thể xóa comment
+                //check if owner to have permission to delete cmt
                 if ((!comment.UserId.HasValue || comment.UserId.Value != userId.Value) && entry.UserId != userId.Value)
                 {
                     return Forbid();

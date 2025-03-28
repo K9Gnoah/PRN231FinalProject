@@ -36,18 +36,16 @@ namespace PersonalDiary.Web.Services
                 // Add token to header
                 UpdateAuthorizationHeader();
 
-                // Debug: Log token và auth header
+                // Debug: log token
                 var token = _httpContextAccessor.HttpContext?.Session.GetString("JWTToken");
                 Console.WriteLine($"Token exists: {!string.IsNullOrEmpty(token)}");
                 Console.WriteLine($"Authorization header: {_httpClient.DefaultRequestHeaders.Authorization}");
 
-                // Debug: Kiểm tra trạng thái của commentDto trước khi gửi
                 Console.WriteLine($"CommentDTO: EntryId={commentDto.entryId}, Content={commentDto.content}, GuestName={commentDto.guestName ?? "null"}");
 
-                // Nếu người dùng đã đăng nhập nhưng GuestName vẫn bị yêu cầu, hãy thêm dòng này:
                 if (string.IsNullOrEmpty(commentDto.guestName) && !string.IsNullOrEmpty(token))
                 {
-                    commentDto.guestName = "LoggedInUser"; // Một giá trị giả để tránh validation error
+                    commentDto.guestName = "LoggedInUser"; 
                 }
 
                 var jsonContent = JsonConvert.SerializeObject(commentDto);
@@ -80,7 +78,6 @@ namespace PersonalDiary.Web.Services
 
             var content = new StringContent(JsonConvert.SerializeObject(entryDto), Encoding.UTF8, "application/json");
 
-            // Log dữ liệu gửi lên
             Console.WriteLine("Sending data: " + await content.ReadAsStringAsync());
 
             var response = await _httpClient.PostAsync($"{_baseUrl}/DiaryEntries", content);
@@ -125,7 +122,7 @@ namespace PersonalDiary.Web.Services
                     NullValueHandling = NullValueHandling.Include
                 };
 
-                // Thêm bước này để xem JSON trả về có cấu trúc gì
+
                 // Deserialize thành dynamic trước để xem cấu trúc
                 var dynamicResponse = JsonConvert.DeserializeObject<dynamic>(content);
                 foreach (var item in dynamicResponse)
@@ -257,10 +254,7 @@ namespace PersonalDiary.Web.Services
             return new AuthResponse { Success = false, Message = "Login failed!" + responseContent };
         }
 
-        public Task<AuthResponse> RegisterAsync(RegisterRequest registerRequest)
-        {
-            throw new NotImplementedException();
-        }
+
 
 
         public async Task UpdateDiaryEntryAsync(int id, DiaryEntryUpdateDTO entryDto)
@@ -280,13 +274,12 @@ namespace PersonalDiary.Web.Services
 
             if (!string.IsNullOrEmpty(token))
             {
-                // Xóa header cũ trước khi thêm mới
+                // remove old header before add new header
                 if (_httpClient.DefaultRequestHeaders.Contains("Authorization"))
                 {
                     _httpClient.DefaultRequestHeaders.Remove("Authorization");
                 }
 
-                // Thêm header mới đảm bảo đúng format "Bearer {token}"
                 _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {token}");
 
                 // Kiểm tra lại để xác nhận header đã được thêm đúng
@@ -347,6 +340,53 @@ namespace PersonalDiary.Web.Services
             {
                 Console.WriteLine($"Error in GetAuthorInfoAsync: {ex.Message}");
                 return (0, new List<DiaryEntryDTO>());
+            }
+        }
+
+        public async Task<AuthResponseDTO> RegisterAsync(RegisterDTO model)
+        {
+            try
+            {
+                Console.WriteLine($"Sending register request to: {_baseUrl}/Users/register");
+                Console.WriteLine($"User data: {JsonConvert.SerializeObject(model)}");
+
+                var json = JsonConvert.SerializeObject(model);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+
+                var response = await _httpClient.PostAsync($"{_baseUrl}/Auth/register", content);
+
+
+                var responseContent = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"Register API response: {response.StatusCode}, Content: {responseContent}");
+
+                // Phần còn lại giữ nguyên
+                if (response.IsSuccessStatusCode)
+                {
+                    return new AuthResponseDTO
+                    {
+                        Success = true,
+                        Message = "Đăng ký thành công"
+                    };
+                }
+                else
+                {
+                    // Hiển thị thông tin chi tiết hơn về lỗi
+                    return new AuthResponseDTO
+                    {
+                        Success = false,
+                        Message = $"Đăng ký thất bại: {response.StatusCode}. Chi tiết: {responseContent}"
+                    };
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Exception in RegisterAsync: {ex.Message}");
+                return new AuthResponseDTO
+                {
+                    Success = false,
+                    Message = $"Lỗi kết nối đến API: {ex.Message}"
+                };
             }
         }
     }

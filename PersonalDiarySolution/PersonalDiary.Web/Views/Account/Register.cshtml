@@ -1,49 +1,63 @@
-﻿@model PersonalDiary.Web.Models.DTOs.RegisterRequest
+﻿@model PersonalDiary.Web.Models.DTOs.RegisterDTO
+
 @{
-    ViewData["Title"] = "Đăng ký";
+    ViewData["Title"] = "Đăng ký tài khoản";
 }
 
-<div class="row justify-content-center">
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header bg-primary text-white">
-                <h2 class="text-center mb-0">Đăng ký tài khoản</h2>
-            </div>
-            <div class="card-body">
-                <form asp-action="Register" method="post">
-                    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white text-center">
+                    <h3>@ViewData["Title"]</h3>
+                </div>
+                <div class="card-body">
+                    @if (!ViewData.ModelState.IsValid)
+                    {
+                        <div class="alert alert-danger">
+                            <div asp-validation-summary="All" class="text-danger"></div>
+                        </div>
+                    }
 
-                    <div class="mb-3">
-                        <label asp-for="Username" class="form-label">Tên đăng nhập</label>
-                        <input asp-for="Username" class="form-control" />
-                        <span asp-validation-for="Username" class="text-danger"></span>
-                    </div>
+                    <form asp-action="Register" method="post">
+                        <div class="mb-3">
+                            <label asp-for="Username" class="form-label">Tên đăng nhập</label>
+                            <input asp-for="Username" class="form-control" autocomplete="username" />
+                            <span asp-validation-for="Username" class="text-danger"></span>
+                        </div>
 
-                    <div class="mb-3">
-                        <label asp-for="Email" class="form-label">Email</label>
-                        <input asp-for="Email" class="form-control" type="email" />
-                        <span asp-validation-for="Email" class="text-danger"></span>
-                    </div>
+                        <div class="mb-3">
+                            <label asp-for="Email" class="form-label">Email</label>
+                            <input asp-for="Email" class="form-control" autocomplete="email" />
+                            <span asp-validation-for="Email" class="text-danger"></span>
+                        </div>
 
-                    <div class="mb-3">
-                        <label asp-for="FullName" class="form-label">Họ và tên</label>
-                        <input asp-for="FullName" class="form-control" />
-                        <span asp-validation-for="FullName" class="text-danger"></span>
-                    </div>
+                        <div class="mb-3">
+                            <label asp-for="FullName" class="form-label">Họ tên đầy đủ</label>
+                            <input asp-for="FullName" class="form-control" autocomplete="name" />
+                            <span asp-validation-for="FullName" class="text-danger"></span>
+                        </div>
 
-                    <div class="mb-3">
-                        <label asp-for="Password" class="form-label">Mật khẩu</label>
-                        <input asp-for="Password" class="form-control" type="password" />
-                        <span asp-validation-for="Password" class="text-danger"></span>
-                    </div>
+                        <div class="mb-3">
+                            <label asp-for="Password" class="form-label">Mật khẩu</label>
+                            <input asp-for="Password" class="form-control" autocomplete="new-password" />
+                            <span asp-validation-for="Password" class="text-danger"></span>
+                        </div>
 
-                    <div class="d-grid">
-                        <button type="submit" class="btn btn-primary">Đăng ký</button>
-                    </div>
-                </form>
-            </div>
-            <div class="card-footer text-center">
-                Đã có tài khoản? <a asp-controller="Account" asp-action="Login">Đăng nhập</a>
+                        <div class="mb-3">
+                            <label asp-for="ConfirmPassword" class="form-label">Xác nhận mật khẩu</label>
+                            <input asp-for="ConfirmPassword" class="form-control" autocomplete="new-password" />
+                            <span asp-validation-for="ConfirmPassword" class="text-danger"></span>
+                        </div>
+
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary">Đăng ký</button>
+                        </div>
+                    </form>
+                </div>
+                <div class="card-footer text-center">
+                    <div>Đã có tài khoản? <a asp-action="Login">Đăng nhập</a></div>
+                </div>
             </div>
         </div>
     </div>

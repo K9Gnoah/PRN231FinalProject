@@ -6,7 +6,7 @@ namespace PersonalDiary.Web.Services.Interface
     {
         //auth
         Task<AuthResponse> LoginAsync(LoginRequest loginRequest);
-        Task<AuthResponse> RegisterAsync(RegisterRequest registerRequest);
+        Task<AuthResponseDTO> RegisterAsync(RegisterDTO model);
 
         //diary entries
         Task<List<DiaryEntryDTO>> GetPublicEntriesAsync();

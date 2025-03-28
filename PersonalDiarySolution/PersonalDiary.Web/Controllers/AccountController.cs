@@ -45,31 +45,58 @@ namespace PersonalDiary.Web.Controllers
         [HttpGet]
         public IActionResult Register()
         {
-            //if user is already logged in, redirect to home page
             if (!string.IsNullOrEmpty(HttpContext.Session.GetString("JWTToken")))
             {
                 return RedirectToAction("Index", "Home");
             }
+
             return View();
         }
 
+        // POST: /Account/Register
         [HttpPost]
-        public async Task<IActionResult> Register(RegisterRequest registerRequest)
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Register(RegisterDTO model)
         {
-            if(!ModelState.IsValid)
+            try
             {
-                return View(registerRequest);
-            }
+                if (!ModelState.IsValid)
+                {
+                    return View(model);
+                }
 
-            var result = await _httpClientService.RegisterAsync(registerRequest);
-            if (result.Success)
+                if (model.Password != model.ConfirmPassword)
+                {
+                    ModelState.AddModelError("ConfirmPassword", "Mật khẩu xác nhận không khớp");
+                    return View(model);
+                }
+
+                // Gọi API để đăng ký
+                var result = await _httpClientService.RegisterAsync(model);
+
+                if (result.Success)
+                {
+                    TempData["SuccessMessage"] = "Đăng ký tài khoản thành công! Vui lòng đăng nhập để tiếp tục.";
+                    return RedirectToAction("Login");
+                }
+                else
+                {
+                    // Hiển thị thông báo lỗi chi tiết từ API
+                    ModelState.AddModelError("", result.Message);
+
+                    // Log lỗi để debug
+                    Console.WriteLine($"Registration failed: {result.Message}");
+
+                    return View(model);
+                }
+            }
+            catch (Exception ex)
             {
-                TempData["SuceessMessage"] = $"Chào mừng {result.Username}! Tài khoản của bạn đã được tạo thành công.";
-                return RedirectToAction("Index", "Home");
+                // Log exception
+                Console.WriteLine($"Exception during registration: {ex.Message}");
+                ModelState.AddModelError("", $"Lỗi đăng ký: {ex.Message}");
+                return View(model);
             }
-
-            ModelState.AddModelError("", result.Message);
-            return View(registerRequest);
         }
 
         [HttpPost]
