@@ -200,11 +200,21 @@ namespace PersonalDiary.Web.Services
 
         public async Task<List<TagDTO>> GetPopularTagsAsync(int count = 10)
         {
-            var response = await _httpClient.GetAsync($"{_baseUrl}/Tags/popular?count={count}");
-            response.EnsureSuccessStatusCode();
+            try
+            {
+                var response = await _httpClient.GetAsync($"{_baseUrl}/Tags/popular?count={count}");
+                response.EnsureSuccessStatusCode();
 
-            var content = await response.Content.ReadAsStringAsync();
-            return JsonConvert.DeserializeObject<List<TagDTO>>(content);
+                var content = await response.Content.ReadAsStringAsync();
+                var popularTags = JsonConvert.DeserializeObject<List<TagDTO>>(content);
+
+                return popularTags ?? new List<TagDTO>();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in GetPopularTagsAsync: {ex.Message}");
+                return new List<TagDTO>();
+            }
         }
 
         public async Task<List<DiaryEntryDTO>> GetPublicEntriesAsync()

@@ -316,15 +316,18 @@ namespace PersonalDiary.API.Controllers
             entry.IsPublic = entryDTO.IsPublic;
             entry.ModifiedDate = DateTime.Now;
 
-            //update tags
-            if(entryDTO.TagNames != null)
-            {
-                //remove all tags
-                entry.Tags.Clear();
+            //update tags - luôn luôn xóa tag cũ và thêm lại tag mới (nếu có)
+            entry.Tags.Clear();
 
+            //Chỉ thêm tags mới nếu TagNames không phải null và có ít nhất một phần tử
+            if (entryDTO.TagNames != null && entryDTO.TagNames.Any())
+            {
                 //add new tags
                 foreach (var tagName in entryDTO.TagNames)
                 {
+                    if (string.IsNullOrWhiteSpace(tagName))
+                        continue;
+
                     var tag = await _context.Tags.FirstOrDefaultAsync(t => t.TagName == tagName);
                     if (tag == null)
                     {

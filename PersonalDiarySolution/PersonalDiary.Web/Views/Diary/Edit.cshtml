@@ -1,55 +1,278 @@
 ﻿@model PersonalDiary.Web.Models.DTOs.DiaryEntryUpdateDTO
+
 @{
     ViewData["Title"] = "Chỉnh sửa bài viết";
 }
+<div class="debug-info" style="background-color: #f8f9fa; padding: 10px; margin-bottom: 20px; border-radius: 4px;">
+    <h6>Debug Info:</h6>
+    <p>Entry ID: @ViewBag.EntryId</p>
+    <p>Tags Count: @(Model?.TagNames?.Count ?? 0)</p>
+    @if (Model?.TagNames != null)
+    {
+        <ul>
+            @foreach (var tag in Model.TagNames)
+            {
+                <li>@tag</li>
+            }
+        </ul>
+    }
+</div>
 
-<h1>Chỉnh sửa bài viết</h1>
+<div class="container mt-4">
+    <h1 class="mb-4">@ViewData["Title"]</h1>
 
-<hr />
+    <form asp-action="Edit" method="post">
+        <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+        <input type="hidden" name="id" value="@ViewBag.EntryId" />
+        <!-- Các trường form hiện tại -->
+        <div class="mb-3">
+            <label asp-for="Title" class="form-label">Tiêu đề</label>
+            <input asp-for="Title" class="form-control" required />
+            <span asp-validation-for="Title" class="text-danger"></span>
+        </div>
 
-<form asp-action="Edit" method="post">
-    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+        <div class="mb-3">
+            <label asp-for="Content" class="form-label">Nội dung</label>
+            <textarea asp-for="Content" class="form-control" rows="10"></textarea>
+            <span asp-validation-for="Content" class="text-danger"></span>
+        </div>
 
-    <div class="mb-3">
-        <label asp-for="Title" class="form-label">Tiêu đề</label>
-        <input asp-for="Title" class="form-control" />
-        <span asp-validation-for="Title" class="text-danger"></span>
-    </div>
+        <!-- Các trường khác trong form -->
+        <!-- Phần tags với thiết kế cải tiến -->
+        <div class="mb-3 card">
+            <div class="card-header bg-light">
+                <h5 class="mb-0">Tags</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-8">
+                        <div class="input-group mb-3">
+                            <input type="text" id="tagInput" class="form-control" placeholder="Nhập tag và nhấn Enter" />
+                            <button type="button" id="addTagBtn" class="btn btn-outline-primary">
+                                <i class="bi bi-plus"></i> Thêm
+                            </button>
+                        </div>
 
-    <div class="mb-3">
-        <label asp-for="Content" class="form-label">Nội dung</label>
-        <textarea asp-for="Content" class="form-control" rows="10"></textarea>
-        <span asp-validation-for="Content" class="text-danger"></span>
-    </div>
+                        <!-- Hiển thị tags đã chọn -->
+                        <div id="selectedTags" class="selected-tags-container mb-3"></div>
 
-    <div class="mb-3">
-        <label asp-for="Mood" class="form-label">Tâm trạng</label>
-        <input asp-for="Mood" class="form-control" />
-        <span asp-validation-for="Mood" class="text-danger"></span>
-    </div>
+                        <!-- Input ẩn để lưu dữ liệu tags khi submit -->
+                        <div id="tagInputs" class="d-none">
+                            @if (Model?.TagNames != null && Model.TagNames.Any())
+                            {
+                                @foreach (var tag in Model.TagNames)
+                                {
+                                    <input type="hidden" name="TagNames" value="@tag" />
+                                }
+                            }
+                        </div>
+                    </div>
 
-    <div class="mb-3">
-        <label asp-for="Weather" class="form-label">Thời tiết</label>
-        <input asp-for="Weather" class="form-control" />
-        <span asp-validation-for="Weather" class="text-danger"></span>
-    </div>
+                    <div class="col-md-4">
+                        <div class="popular-tags-container">
+                            <h6 class="mb-2">Tags phổ biến</h6>
+                            @if (ViewBag.PopularTags != null && ViewBag.PopularTags.Count > 0)
+                            {
+                                <div class="popular-tags">
+                                    @foreach (var tag in ViewBag.PopularTags)
+                                    {
+                                        <span class="badge bg-secondary popular-tag me-1 mb-1"
+                                              style="cursor: pointer;"
+                                              onclick="globalAddTagToUI('@tag.TagName')">
+                                            @tag.TagName
+                                        </span>
+                                    }
+                                </div>
+                            }
+                            else
+                            {
+                                <p class="text-muted small">Không có tags phổ biến.</p>
+                            }
+                        </div>
+                    </div>
+                    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Tags</h5>
+                        <button id="clearAllTags" type="button" class="btn btn-sm btn-outline-danger">
+                            <i class="bi bi-trash"></i> Xóa tất cả tags
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-    <div class="mb-3">
-        <label asp-for="TagNames" class="form-label">Tags (cách nhau bằng dấu phẩy)</label>
-        <input asp-for="TagNames" class="form-control" />
-        <span asp-validation-for="TagNames" class="text-danger"></span>
-    </div>
+        <!-- Các trường còn lại -->
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <label asp-for="Mood" class="form-label">Tâm trạng</label>
+                <input asp-for="Mood" class="form-control" />
+                <span asp-validation-for="Mood" class="text-danger"></span>
+            </div>
+            <div class="col-md-6">
+                <label asp-for="Weather" class="form-label">Thời tiết</label>
+                <input asp-for="Weather" class="form-control" />
+                <span asp-validation-for="Weather" class="text-danger"></span>
+            </div>
+        </div>
 
-    <div class="mb-3 form-check">
-        <input asp-for="IsPublic" class="form-check-input" />
-        <label asp-for="IsPublic" class="form-check-label">Công khai</label>
-    </div>
+        <div class="mb-3 form-check">
+            <input asp-for="IsPublic" class="form-check-input" />
+            <label asp-for="IsPublic" class="form-check-label">Công khai</label>
+            <span asp-validation-for="IsPublic" class="text-danger"></span>
+        </div>
 
-    <button type="submit" class="btn btn-primary">Lưu thay đổi</button>
-</form>
+        <div class="mb-3">
+            <button type="submit" class="btn btn-primary">Lưu bài viết</button>
+            <a asp-action="Index" class="btn btn-secondary">Quay lại</a>
+        </div>
+    </form>
+</div>
+
+@section Styles {
+    <style>
+        .selected-tags-container {
+            min-height: 38px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            padding: 8px;
+            background-color: #f8f9fa;
+        }
+
+            .selected-tags-container:empty::before {
+                content: 'Chưa có tag nào được chọn';
+                color: #6c757d;
+                font-style: italic;
+            }
+
+        .popular-tags {
+            display: flex;
+            flex-wrap: wrap;
+        }
+
+        .popular-tag {
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+            .popular-tag:hover {
+                background-color: #495057;
+                transform: translateY(-2px);
+            }
+
+        .tag-badge {
+            display: inline-flex;
+            align-items: center;
+            margin-right: 5px;
+            margin-bottom: 5px;
+        }
+
+            .tag-badge .btn-close {
+                margin-left: 5px;
+                font-size: 10px;
+            }
+    </style>
+}
 
 @section Scripts {
     @{
         await Html.RenderPartialAsync("_ValidationScriptsPartial");
     }
+
+    <script>
+        $('#clearAllTags').on('click', function () {
+            $('#selectedTags').empty();
+            // Xóa tất cả input hidden
+            $('#tagInputs').empty();
+            // Hiển thị thông báo (tùy chọn)
+            $('#selectedTags').append('<span class="text-muted">Đã xóa tất cả tags</span>');
+        });
+
+        var globalAddTagToUI;
+
+        $(document).ready(function () {
+            console.log("Document ready");
+
+
+            function initExistingTags() {
+                console.log("Init existing tags");
+                console.log("Tag inputs count:", $('#tagInputs input[name="TagNames"]').length);
+
+                $('#tagInputs input[name="TagNames"]').each(function () {
+                    addTagToUI($(this).val());
+                });
+            }
+
+            // Thêm tag vào UI
+            function addTagToUI(tagName) {
+                console.log("Adding tag:", tagName);
+                if (!tagName || tagName.trim() === '') return;
+                tagName = tagName.trim();
+
+                // Kiểm tra tag đã tồn tại chưa
+                if ($(`#tagInputs input[value="${tagName}"]`).length > 0) {
+                    console.log("Tag already exists:", tagName);
+                    return; // Tag đã tồn tại, không thêm nữa
+                }
+
+                // Tạo badge hiển thị tag
+                const tagBadge = $(`
+                        <span class="badge bg-primary tag-badge">
+                            ${tagName}
+                            <button type="button" class="btn-close btn-close-white" aria-label="Remove"></button>
+                        </span>
+                    `);
+
+                // Xử lý sự kiện khi click vào nút xóa
+                tagBadge.find('.btn-close').on('click', function () {
+                    // Xóa tag khỏi UI và input hidden
+                    $(`#tagInputs input[value="${tagName}"]`).remove();
+                    tagBadge.remove();
+                });
+
+                // Thêm vào container hiển thị
+                $('#selectedTags').append(tagBadge);
+
+                // Thêm input hidden để submit form
+                $('#tagInputs').append(`<input type="hidden" name="TagNames" value="${tagName}" />`);
+            }
+
+            // Gán cho biến global để có thể truy cập từ bên ngoài
+            globalAddTagToUI = addTagToUI;
+
+            // Xử lý thêm tag từ input
+            function addTagFromInput() {
+                const tagInput = $('#tagInput');
+                const tagName = tagInput.val().trim();
+
+                if (tagName) {
+                    addTagToUI(tagName);
+                    tagInput.val('').focus();
+                }
+            }
+
+            // Thêm tag khi click vào nút Thêm
+            $('#addTagBtn').on('click', function () {
+                console.log("Add button clicked");
+                addTagFromInput();
+            });
+
+            // Thêm tag khi nhấn Enter trong input
+            $('#tagInput').on('keydown', function (e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    addTagFromInput();
+                }
+            });
+
+            // Sử dụng delegate event để bắt sự kiện click trên tag phổ biến
+            $(document).on('click', '.popular-tag', function () {
+                console.log("Popular tag clicked");
+                const tagName = $(this).text().trim();
+                console.log("Tag name:", tagName);
+                addTagToUI(tagName);
+            });
+
+            // Khởi tạo tags ban đầu nếu có
+            initExistingTags();
+        });
+    </script>
 }

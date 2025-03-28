@@ -71,7 +71,6 @@ namespace PersonalDiary.Web.Controllers
         // GET: /Diary/Create
         public async Task<IActionResult> Create()
         {
-            // Kiểm tra đăng nhập
             if (string.IsNullOrEmpty(HttpContext.Session.GetString("JWTToken")))
             {
                 return RedirectToAction("Login", "Account");
@@ -79,6 +78,9 @@ namespace PersonalDiary.Web.Controllers
 
             // Lấy danh sách tag để hiển thị gợi ý
             ViewBag.Tags = await _httpClientService.GetTagsAsync();
+
+            // Lấy danh sách tag phổ biến
+            ViewBag.PopularTags = await _httpClientService.GetPopularTagsAsync(15);
 
             return View();
         }
@@ -145,6 +147,8 @@ namespace PersonalDiary.Web.Controllers
                 };
 
                 ViewBag.Tags = await _httpClientService.GetTagsAsync();
+                ViewBag.PopularTags = await _httpClientService.GetPopularTagsAsync(15);
+                ViewBag.EntryId = id;
                 return View(editDto);
             }
             catch (Exception ex)
@@ -168,11 +172,16 @@ namespace PersonalDiary.Web.Controllers
             if (!ModelState.IsValid)
             {
                 ViewBag.Tags = await _httpClientService.GetTagsAsync();
+                ViewBag.PopularTags = await _httpClientService.GetPopularTagsAsync(15);
+                ViewBag.EntryId = id;
                 return View(entryDto);
             }
 
             try
             {
+                // Đảm bảo TagNames không null khi gửi đến API
+                entryDto.TagNames ??= new List<string>();
+
                 await _httpClientService.UpdateDiaryEntryAsync(id, entryDto);
                 TempData["SuccessMessage"] = "Bài viết đã được cập nhật thành công!";
                 return RedirectToAction(nameof(Details), new { id });
@@ -181,6 +190,8 @@ namespace PersonalDiary.Web.Controllers
             {
                 ModelState.AddModelError("", "Không thể cập nhật bài viết: " + ex.Message);
                 ViewBag.Tags = await _httpClientService.GetTagsAsync();
+                ViewBag.PopularTags = await _httpClientService.GetPopularTagsAsync(15);
+                ViewBag.EntryId = id;
                 return View(entryDto);
             }
         }
